@@ -1,4 +1,4 @@
-const API_URL = "http://127.0.0.1:8000/productos";
+const API_URL = "http://127.0.0.1:8001/productos";
 
 // Selección de Elementos del DOM
 const formProducto = document.getElementById("formProducto");
@@ -78,7 +78,7 @@ async function eliminarProducto(id_producto){
     event.preventDefault();
 
     try {
-        const respuesta = await fetch("http://127.0.0.1:8000/productos/"+id_producto, {method: "DELETE", headers: {"Content-Type": "application/json"}});
+        const respuesta = await fetch("http://127.0.0.1:8001/productos/"+id_producto, {method: "DELETE", headers: {"Content-Type": "application/json"}});
 
         if(respuesta){
             await cargarProductos();
