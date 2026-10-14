@@ -9,9 +9,23 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 from pydantic import BaseModel, Field
 from typing import List
+from collections import deque
+import time
 
 app = FastAPI(title="Api Proyecto Tiendita", version="1.0.0")
 
+
+# Almacena los tiempos de las últimas peticiones
+peticiones = deque()
+
+# Evita que dos peticiones modifiquen el contador al mismo tiempo
+lock = asyncio.Lock()
+
+@app.middleware("/http")
+async def limitar_peticiones(request: Request, call_next):
+
+    async with lock:
+        ahora = time.monotonic()
 
 #prueba 10 sec
 @app.get("/prueba-asyncio10")
