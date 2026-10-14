@@ -1,9 +1,50 @@
-from fastapi import FastAPI
+#Mi tiendita
+#autor: Marco Preciado
+#Fecha: 05/oct/2026
+#una api para mostrar via html productos de tiendita podemos borrar agregar consultar
+
+
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+import asyncio
+from pydantic import BaseModel, Field
+from typing import List
+
+app = FastAPI(title="Api Proyecto Tiendita", version="1.0.0")
 
 
-app = FastAPI()
-
+#prueba 10 sec
+@app.get("/prueba-asyncio10")
+async def consultar_bd():
+    #cede el conttrol al event loop
+    await asyncio.sleep(10)
+    print("prueba")
+    return {"status":"ok"}
+    
+#prueba 5 sec
+@app.get("/prueba-asyncio5")
+async def consultar_bd():
+    #cede el conttrol al event loop
+    await asyncio.sleep(5)
+    print("prueba")
+    return {"status":"ok"}
+    
+#prueba 3 sec
+@app.get("/prueba-asyncio3")
+async def consultar_bd():
+    #cede el conttrol al event loop
+    await asyncio.sleep(3)
+    print("prueba")
+    return {"status":"ok"}
+    
+#prueba 1 sec
+@app.get("/prueba-asyncio1")
+async def consultar_bd():
+    #cede el conttrol al event loop
+    await asyncio.sleep(1)
+    print("prueba")
+    return {"status":"ok"}
+    
 
 app.add_middleware(
     CORSMiddleware,
@@ -28,6 +69,23 @@ inventario = [
     {"id": 11, "nombre": "Sony Xperia 10 VI", "precio": 10999, "cantidad": 116}
 ]
 
+#Modelos Pydantic Pedir al cliente que su peticion debe tener esta estructura
+
+class crearProducto(BaseModel):
+    nombre: str = Field(..., min_length=1, description="nombre de producto")
+    precio: float = Field(..., gt=0, description="Precio del producto")
+    cantidad: int = Field(..., ge=0, description="Stock del producto")
+
+#Modelo Pydantic  Salida Api con esta estructura
+
+class respuestaProducto(BaseModel):
+    id: int
+    nombre: str
+    precio: float
+    cantidad: int
+
+
+
 @app.get("/")
 def home():
     return {"Message": "Hola bienvenido"}
@@ -36,27 +94,38 @@ def home():
 def getProductos():
     return inventario
 
-@app.post("/productos")
-def addProducto(producto: dict):
+@app.post("/productos", response_model=List[crearProducto], status_code=status.HTTP_201_CREATED)
+def addProducto(producto: crearProducto):
+    try:
 
-    nuevo_id = len(inventario) + 1
-    nuevo_producto = {
-        "id": nuevo_id,    
-        "nombre": producto["nombre"],
-        "precio": producto["precio"],
-        "cantidad": producto["cantidad"]
-    }
+        nuevo_id = len(inventario) + 1
+        nuevo_producto = {
+            "id": nuevo_id,    
+            "nombre": producto.nombre,
+            "precio": producto.precio,
+            "cantidad": producto.cantidad
+        }
 
-    inventario.append(nuevo_producto)
+        inventario.append(nuevo_producto)
 
-    return inventario
+        return inventario
+    
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"ocurrio un error:{str(error)}")
+
+#DELETE borra productos del inventario 
 
 @app.delete("/productos/{producto_id}")
 def deleteProducto(producto_id: int):
-    for producto in inventario:
-        if producto["id"] == producto_id:
-            inventario.remove(producto)
-            return {"Message": "El producto fue eliminado"}
-    return {"Message": "No fue encontrado el producto"}
-
-
+    try:
+        for producto in inventario:
+            if producto["id"] == producto_id:
+                inventario.remove(producto)
+                return {"Message": "El producto fue eliminado"}
+        return {"Message": "No fue encontrado el producto"}
+    except HTTPException as errorHTTP:
+        return{str(errorHTTP)}
+    except Exception as error:
+        return {str(error)}
