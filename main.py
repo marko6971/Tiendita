@@ -3,7 +3,6 @@
 #Fecha: 05/oct/2026
 #una api para mostrar via html productos de tiendita podemos borrar agregar consultar
 
-
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
@@ -14,14 +13,13 @@ import time
 
 app = FastAPI(title="Api Proyecto Tiendita", version="1.0.0")
 
-
 # Almacena los tiempos de las últimas peticiones
 peticiones = deque()
 
 # Evita que dos peticiones modifiquen el contador al mismo tiempo
 lock = asyncio.Lock()
 
-@app.middleware("/http")
+@app.middleware("http")
 async def limitar_peticiones(request: Request, call_next):
 
     async with lock:
@@ -102,7 +100,16 @@ class respuestaProducto(BaseModel):
 
 @app.get("/")
 def home():
-    return {"Message": "Hola bienvenido"}
+    try:
+        print("HOLA")
+        resultado = "1"+1,
+        print("HOLA2")
+        return {"Message": "Hola bienvenido"}
+    except Exception as error:
+        raise HTTPException(
+            status_Code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f("Error al hacer la operacion: {srt(error)}")
+        )
 
 @app.get("/productos")
 def getProductos():
@@ -143,3 +150,28 @@ def deleteProducto(producto_id: int):
         return{str(errorHTTP)}
     except Exception as error:
         return {str(error)}
+
+#inicializamos variable de asyncio
+
+lock = asyncio.lock()
+
+@app.post("/productos/{producto_id}")
+async def comprarProducto(producto_id: int):
+    try:
+        async with lock:
+            for objeto in inventario:
+                if objeto["id"] == producto_id:
+                    if objeto["cantidad"]>0:
+                        await asyncio.sleep(0.05)
+                        objeto["cantidad"] = objeto["cantidad"]-1
+                        return{"mensaje":"producto comprado"}
+                    else
+                        raise HTTPException(
+                            status_code = status.HTTP_400_BAD_REQUEST,
+                            detail = "no hay stock de ese producto"
+                        )
+            raise HTTPException(
+                status_code = status.HTTP_400_BAD_REQUEST,
+                detail = "No existe el Id de ese producto"
+            )
+

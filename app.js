@@ -39,6 +39,11 @@ async function cargarProductos() {
                     </span>
                 </td>
                 <td class="text-end">
+                    <button class="btn btn-outline-primary btn-sm" onclick="comprarProducto(${p.id})">
+                        <i class="bi bi-trash"></i> Comprar
+                    </button>
+                </td>
+                <td class="text-end">
                     <button class="btn btn-outline-danger btn-sm" onclick="eliminarProducto(${p.id})">
                         <i class="bi bi-trash"></i> Eliminar
                     </button>
