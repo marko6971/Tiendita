@@ -95,6 +95,22 @@ async function eliminarProducto(id_producto){
     }
 }
 
+async function comprarProducto(id_producto){
+    event.preventDefault();
+
+    try {
+        const respuesta = await fetch("http://127.0.0.1:8001/productos/"+id_producto, {method: "POST", headers: {"Content-Type": "application/json"}});
+
+        if(respuesta){
+            await cargarProductos();
+        }else{
+            console.error("Hubo algo malo al eliminar")
+        }
+    } catch (error) {
+        console.log(error)
+    }
+}
+
 
 
 // Cargar catálogo al abrir la página

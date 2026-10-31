@@ -11,52 +11,7 @@ from typing import List
 from collections import deque
 import time
 
-app = FastAPI(title="Api Proyecto Tiendita", version="1.0.0")
-
-# Almacena los tiempos de las últimas peticiones
-peticiones = deque()
-
-# Evita que dos peticiones modifiquen el contador al mismo tiempo
-lock = asyncio.Lock()
-
-@app.middleware("http")
-async def limitar_peticiones(request: Request, call_next):
-
-    async with lock:
-        ahora = time.monotonic()
-
-#prueba 10 sec
-@app.get("/prueba-asyncio10")
-async def consultar_bd():
-    #cede el conttrol al event loop
-    await asyncio.sleep(10)
-    print("prueba")
-    return {"status":"ok"}
-    
-#prueba 5 sec
-@app.get("/prueba-asyncio5")
-async def consultar_bd():
-    #cede el conttrol al event loop
-    await asyncio.sleep(5)
-    print("prueba")
-    return {"status":"ok"}
-    
-#prueba 3 sec
-@app.get("/prueba-asyncio3")
-async def consultar_bd():
-    #cede el conttrol al event loop
-    await asyncio.sleep(3)
-    print("prueba")
-    return {"status":"ok"}
-    
-#prueba 1 sec
-@app.get("/prueba-asyncio1")
-async def consultar_bd():
-    #cede el conttrol al event loop
-    await asyncio.sleep(1)
-    print("prueba")
-    return {"status":"ok"}
-    
+app = FastAPI(title="API Proyecto Tiendita", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -66,7 +21,27 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+#Inicializamos variable lock (Condición de carrera)
+lock = asyncio.Lock()
 
+
+#Modelos de Pydantic
+#Pedir al cliente que su petición debe estructurarse de esta manera.
+class crearProducto(BaseModel):
+    nombre: str = Field(..., min_length=1, description="Nombre del producto")
+    precio: float = Field(..., gt=0, description="Precio del producto")
+    cantidad: int = Field(..., ge=0, description="stock del producto")
+
+
+#La salida de datos de la API debe de estructurarse de esta manera.
+class respuestaProducto(BaseModel):
+    id: int
+    nombre: str
+    precio: float
+    cantidad: int
+
+
+#Datos cargados (Simulación)
 inventario = [
     {"id": 1, "nombre": "iPhone 15", "precio": 14999, "cantidad": 87},
     {"id": 2, "nombre": "Samsung Galaxy S24", "precio": 16999, "cantidad": 142},
@@ -81,45 +56,66 @@ inventario = [
     {"id": 11, "nombre": "Sony Xperia 10 VI", "precio": 10999, "cantidad": 116}
 ]
 
-#Modelos Pydantic Pedir al cliente que su peticion debe tener esta estructura
 
-class crearProducto(BaseModel):
-    nombre: str = Field(..., min_length=1, description="nombre de producto")
-    precio: float = Field(..., gt=0, description="Precio del producto")
-    cantidad: int = Field(..., ge=0, description="Stock del producto")
+#Prueba asyncio 5 segundos
+@app.get("/prueba-asyncio")
+async def pruebaAsyncio():
+    try:
+        print("empiezan los 5 segundos")
+        await asyncio.sleep(5)
+        print("Se acaba de terminar los 5 segundos")
+        return {"Message": "Respuesta después de 5 segundos"}
+    except Exception as error:
+        print(f"Hubo un error: {error}")
 
-#Modelo Pydantic  Salida Api con esta estructura
+#Prueba asyncio 3 segundos
+@app.get("/prueba-asyncio-3segundos")
+async def pruebaAsyncio():
+    print("empiezan los 3 segundos")
+    await asyncio.sleep(3)
+    print("Se acaba de terminar los 3 segundos")
+    return {"Message": "Respuesta después de 3 segundos"}
 
-class respuestaProducto(BaseModel):
-    id: int
-    nombre: str
-    precio: float
-    cantidad: int
+#Prueba asyncio 1 segundos
+@app.get("/prueba-asyncio-1segundo")
+async def pruebaAsyncio():
+    print("empiezan los 1 segundos")
+    await asyncio.sleep(1)
+    print("Se acaba de terminar los 1 segundos")
+    return {"Message": "Respuesta después de 1 segundos"}
 
 
-
+#Ejemplo de API - GET para obtener mensaje inicial
 @app.get("/")
 def home():
     try:
-        print("HOLA")
-        resultado = "1"+1,
-        print("HOLA2")
+        print("hola1") 
+        resultado = "1"  +  1,
+        print("hola2")
         return {"Message": "Hola bienvenido"}
     except Exception as error:
         raise HTTPException(
-            status_Code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f("Error al hacer la operacion: {srt(error)}")
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al hacer la operación: {str(error)}"
         )
+       
+   
 
+
+#GET Obtiene lista de productos de mi inventario
 @app.get("/productos")
 def getProductos():
-    return inventario
+    try:
+        return inventario
+    except Exception as error:
+        return  {str(error)} 
 
-@app.post("/productos", response_model=List[crearProducto], status_code=status.HTTP_201_CREATED)
+#POST Agrega producto a mi inventario
+@app.post("/productos", response_model=respuestaProducto, status_code=status.HTTP_201_CREATED)
 def addProducto(producto: crearProducto):
     try:
 
-        nuevo_id = len(inventario) + 1
+        nuevo_id = max((p["id"] for p in inventario), default=0) + 1
         nuevo_producto = {
             "id": nuevo_id,    
             "nombre": producto.nombre,
@@ -129,31 +125,29 @@ def addProducto(producto: crearProducto):
 
         inventario.append(nuevo_producto)
 
-        return inventario
-    
+        return nuevo_producto
     except Exception as error:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"ocurrio un error:{str(error)}")
+            detail=f"Error al agregar el producto: {str(error)}"
+        )
 
-#DELETE borra productos del inventario 
-
+    
+#DELETE Borra producto de mi inventario
 @app.delete("/productos/{producto_id}")
 def deleteProducto(producto_id: int):
     try:
         for producto in inventario:
             if producto["id"] == producto_id:
-                inventario.remove(producto)
+                inventario.remove(producto) #Elimina el producto del inventario ya que encontró el id correspondiente
                 return {"Message": "El producto fue eliminado"}
         return {"Message": "No fue encontrado el producto"}
     except HTTPException as errorHTTP:
-        return{str(errorHTTP)}
+        return {str(errorHTTP)}
+
     except Exception as error:
-        return {str(error)}
+        return  {str(error)} 
 
-#inicializamos variable de asyncio
-
-lock = asyncio.lock()
 
 @app.post("/productos/{producto_id}")
 async def comprarProducto(producto_id: int):
@@ -161,17 +155,23 @@ async def comprarProducto(producto_id: int):
         async with lock:
             for objeto in inventario:
                 if objeto["id"] == producto_id:
-                    if objeto["cantidad"]>0:
+                    if objeto["cantidad"] > 0:
                         await asyncio.sleep(0.05)
                         objeto["cantidad"] = objeto["cantidad"]-1
-                        return{"mensaje":"producto comprado"}
-                    else
+                        return {"Mensaje":"Producto comprado"}
+                    else:
                         raise HTTPException(
                             status_code = status.HTTP_400_BAD_REQUEST,
-                            detail = "no hay stock de ese producto"
+                            detail = "No hay stock de ese producto"
                         )
+
             raise HTTPException(
                 status_code = status.HTTP_400_BAD_REQUEST,
-                detail = "No existe el Id de ese producto"
+                detail = "No existe el ID de ese producto"
             )
 
+    except Exception as error:
+        raise HTTPException (
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail = f"Error al comprar producto: {str(error)}"
+        )
