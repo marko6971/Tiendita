@@ -12,13 +12,14 @@ from collections import deque
 import time
 import os
 import csv
+import pandas as pd
 from datetime import datetime
 from pathlib import Path
 
 
 BASE_DIR = Path(__file__).resolve().parent
 ARCHIVO_PRODUCTOS = BASE_DIR / "productos.csv"
-
+ARCHIVO_VENTAS = BASE_DIR / "ventas.csv"
 
 
 app = FastAPI(title="API Proyecto Tiendita", version="1.0.0")
@@ -267,3 +268,128 @@ def registrar_venta_csv(producto_nombre: str, precio: float, cantidad: int = 0):
         fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         monto_total = precio * cantidad
         writer.writerow([nuevo_id, fecha_actual, producto_nombre, precio, cantidad, monto_total])
+
+
+
+#esto nos calcula ventas unidades vendidas, productos registrados y valor de inventario
+@app.get("/analisis/resumen")
+def resumenAnalisis():
+
+    try:
+
+        # Leer archivos CSV con Pandas
+        df_productos = pd.read_csv(ARCHIVO_PRODUCTOS)
+        df_ventas = pd.read_csv(ARCHIVO_VENTAS)
+
+        # Indicadores de ventas
+        ventas_totales = df_ventas["monto_total"].sum()
+
+        unidades_vendidas = df_ventas["cantidad"].sum()
+
+        # Indicadores de inventario
+        productos_registrados = len(df_productos)
+
+        valor_inventario = (
+            df_productos["precio"] *
+            df_productos["cantidad"]
+        ).sum()
+
+        # Respuesta JSON
+        return {
+            "ventas_totales": float(ventas_totales),
+            "unidades_vendidas": int(unidades_vendidas),
+            "productos_registrados": int(productos_registrados),
+            "valor_inventario": float(valor_inventario)
+        }
+
+    except Exception as error:
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error en análisis: {str(error)}"
+        )
+
+#con esto sacamos ventas por producto
+
+@app.get("/analisis/ventas-producto")
+def ventasPorProducto():
+
+    try:
+
+        df = pd.read_csv(ARCHIVO_VENTAS)
+
+        if df.empty:
+            return []
+
+        resumen = (
+            df.groupby("producto")
+            .agg(
+                unidades_vendidas=("cantidad", "sum"),
+                ventas_totales=("monto_total", "sum"),
+                precio_promedio=("precio", "mean")
+            )
+            .reset_index()
+        )
+
+        resumen = resumen.sort_values(
+            by="ventas_totales",
+            ascending=False
+        )
+
+        return resumen.to_dict(orient="records")
+
+    except Exception as error:
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al analizar ventas: {str(error)}"
+        )
+
+
+#con esto sacamos ventas por dia
+@app.get("/analisis/ventas-dia")
+def ventasPorDia():
+
+    try:
+
+        df = pd.read_csv(ARCHIVO_VENTAS)
+
+        if df.empty:
+            return []
+
+        # Convertir fecha a formato datetime
+        df["fecha"] = pd.to_datetime(
+        df["fecha"],
+        format="mixed",
+        dayfirst=True,
+        errors="coerce"
+    )
+
+        # Obtener solamente la fecha
+        df["dia"] = df["fecha"].dt.date
+
+        # Agrupar ventas por día
+        resumen = (
+            df.groupby("dia")
+            .agg(
+                ventas_totales=("monto_total", "sum"),
+                unidades_vendidas=("cantidad", "sum"),
+                numero_ventas=("id_venta", "count")
+            )
+            .reset_index()
+        )
+
+        resumen["dia"] = resumen["dia"].astype(str)
+
+        resumen = resumen.sort_values("dia")
+
+        return resumen.to_dict(orient="records")
+
+    except Exception as error:
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al analizar ventas por día: {str(error)}"
+        )
+
+
