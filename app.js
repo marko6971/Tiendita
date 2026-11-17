@@ -1,4 +1,6 @@
 const API_URL = "http://127.0.0.1:8001/productos";
+const API = "http://127.0.0.1:8001/";
+
 
 // Selección de Elementos del DOM
 const formProducto = document.getElementById("formProducto");
@@ -68,7 +70,7 @@ async function agregarProducto(event){
     try {
         const respuesta = await fetch(API_URL, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(nuevoContenido)});
 
-        if(respuesta){
+        if(respuesta.ok){
             formProducto.reset();
             await cargarProductos();
         }else{
@@ -85,7 +87,7 @@ async function eliminarProducto(id_producto){
     try {
         const respuesta = await fetch("http://127.0.0.1:8001/productos/"+id_producto, {method: "DELETE", headers: {"Content-Type": "application/json"}});
 
-        if(respuesta){
+        if(respuesta.ok){
             await cargarProductos();
         }else{
             console.error("Hubo algo malo al eliminar")
@@ -101,7 +103,7 @@ async function comprarProducto(id_producto){
     try {
         const respuesta = await fetch("http://127.0.0.1:8001/productos/"+id_producto, {method: "POST", headers: {"Content-Type": "application/json"}});
 
-        if(respuesta){
+        if(respuesta.ok){
             await cargarProductos();
         }else{
             console.error("Hubo algo malo al eliminar")
@@ -113,6 +115,8 @@ async function comprarProducto(id_producto){
 
 
 
+
+
 // Cargar catálogo al abrir la página
 document.addEventListener("DOMContentLoaded", cargarProductos);
 
@@ -120,5 +124,3 @@ document.addEventListener("DOMContentLoaded", cargarProductos);
 // Agregamos el evento para que se abre la función al dar clic en guardar producto
 formProducto.addEventListener("submit", agregarProducto);
 
-
-formProducto.addEventListener("submit", agregarProducto);

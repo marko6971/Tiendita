@@ -10,6 +10,16 @@ from pydantic import BaseModel, Field
 from typing import List
 from collections import deque
 import time
+import os
+import csv
+from datetime import datetime
+from pathlib import Path
+
+
+BASE_DIR = Path(__file__).resolve().parent
+ARCHIVO_PRODUCTOS = BASE_DIR / "productos.csv"
+
+
 
 app = FastAPI(title="API Proyecto Tiendita", version="1.0.0")
 
@@ -42,7 +52,7 @@ class respuestaProducto(BaseModel):
 
 
 #Datos cargados (Simulación)
-inventario = [
+inventario_inicial = [
     {"id": 1, "nombre": "iPhone 15", "precio": 14999, "cantidad": 87},
     {"id": 2, "nombre": "Samsung Galaxy S24", "precio": 16999, "cantidad": 142},
     {"id": 3, "nombre": "Xiaomi Redmi Note 13", "precio": 4999, "cantidad": 56},
@@ -99,22 +109,26 @@ def home():
             detail=f"Error al hacer la operación: {str(error)}"
         )
        
-   
 
 
 #GET Obtiene lista de productos de mi inventario
 @app.get("/productos")
 def getProductos():
     try:
-        return inventario
+        return cargar_inventario_csv()
+
     except Exception as error:
-        return  {str(error)} 
+        print("ERROR:", repr(error))
+        raise HTTPException(status_code=500, detail=str(error))
+
+
+
 
 #POST Agrega producto a mi inventario
 @app.post("/productos", response_model=respuestaProducto, status_code=status.HTTP_201_CREATED)
 def addProducto(producto: crearProducto):
     try:
-
+        inventario = cargar_inventario_csv()
         nuevo_id = max((p["id"] for p in inventario), default=0) + 1
         nuevo_producto = {
             "id": nuevo_id,    
@@ -124,7 +138,7 @@ def addProducto(producto: crearProducto):
         }
 
         inventario.append(nuevo_producto)
-
+        guardar_inventario_csv(inventario)
         return nuevo_producto
     except Exception as error:
         raise HTTPException(
@@ -135,43 +149,121 @@ def addProducto(producto: crearProducto):
     
 #DELETE Borra producto de mi inventario
 @app.delete("/productos/{producto_id}")
-def deleteProducto(producto_id: int):
+def delete_producto(producto_id: int):
     try:
-        for producto in inventario:
-            if producto["id"] == producto_id:
-                inventario.remove(producto) #Elimina el producto del inventario ya que encontró el id correspondiente
-                return {"Message": "El producto fue eliminado"}
-        return {"Message": "No fue encontrado el producto"}
-    except HTTPException as errorHTTP:
-        return {str(errorHTTP)}
+        inventario = cargar_inventario_csv()
+        inventario_actualizado = [p for p in inventario if p["id"] != producto_id]
 
-    except Exception as error:
-        return  {str(error)} 
-
-
-@app.post("/productos/{producto_id}")
-async def comprarProducto(producto_id: int):
-    try:
-        async with lock:
-            for objeto in inventario:
-                if objeto["id"] == producto_id:
-                    if objeto["cantidad"] > 0:
-                        await asyncio.sleep(0.05)
-                        objeto["cantidad"] = objeto["cantidad"]-1
-                        return {"Mensaje":"Producto comprado"}
-                    else:
-                        raise HTTPException(
-                            status_code = status.HTTP_400_BAD_REQUEST,
-                            detail = "No hay stock de ese producto"
-                        )
-
+        if len(inventario_actualizado) == len(inventario):
             raise HTTPException(
-                status_code = status.HTTP_400_BAD_REQUEST,
-                detail = "No existe el ID de ese producto"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No fue encontrado el producto",
             )
 
+        guardar_inventario_csv(inventario_actualizado)  # importante: persistir el cambio
+        return {"Message": "El producto fue eliminado"}
+    except HTTPException:
+        raise
     except Exception as error:
-        raise HTTPException (
-            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail = f"Error al comprar producto: {str(error)}"
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al eliminar el producto: {str(error)}",
         )
+
+
+#POST  comprar producto de inventario 
+
+@app.post("/productos/{producto_id}")
+async def comprar_producto(producto_id: int):
+    try:
+        async with lock:
+            inventario = cargar_inventario_csv()
+
+            producto_encontrado = next(
+                (p for p in inventario if p["id"] == producto_id),
+                None,
+            )
+
+            if producto_encontrado is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="No existe el ID de ese producto",
+                )
+
+            if producto_encontrado["cantidad"] <= 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No hay stock de ese producto",
+                )
+
+            await asyncio.sleep(0.05)
+            producto_encontrado["cantidad"] -= 1
+            guardar_inventario_csv(inventario)
+            registrar_venta_csv(
+                producto_nombre=producto_encontrado["nombre"],
+                precio=producto_encontrado["precio"],
+                cantidad=1,
+            )
+
+            return {"Message": "Producto comprado"}
+
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al comprar producto: {str(error)}",
+        )
+
+
+def cargar_inventario_csv():
+
+    print("Buscando archivo:", ARCHIVO_PRODUCTOS)
+    print("¿Existe?:", ARCHIVO_PRODUCTOS.exists())
+
+    productos = []
+
+    with open(ARCHIVO_PRODUCTOS, mode="r",
+              encoding="utf-8-sig", newline="") as f:
+
+        reader = csv.DictReader(f)
+
+        print("Columnas encontradas:", reader.fieldnames)
+
+        for row in reader:
+            productos.append({
+                "id": int(row["id"]),
+                "nombre": row["nombre"],
+                "precio": float(row["precio"]),
+                "cantidad": int(row["cantidad"])
+            })
+
+    print("Total productos:", len(productos))
+
+    return productos
+
+
+def guardar_inventario_csv(productos):
+    with open("productos.csv", mode="w", newline="", encoding="utf-8") as f:
+        fieldnames = ["id", "nombre", "precio", "cantidad"]
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(productos)
+
+
+def registrar_venta_csv(producto_nombre: str, precio: float, cantidad: int = 0):
+    file_exists = os.path.isfile("ventas.csv")
+
+    with open("ventas.csv", mode="a", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+
+        if not file_exists:
+            writer.writerow(["id_venta", "fecha", "producto", "precio", "cantidad", "monto_total"])
+            nuevo_id = 1
+        else:
+            with open("ventas.csv", "r", encoding="utf-8") as f:
+                nuevo_id = sum(1 for line in f)
+
+        fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        monto_total = precio * cantidad
+        writer.writerow([nuevo_id, fecha_actual, producto_nombre, precio, cantidad, monto_total])
