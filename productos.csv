@@ -1,11 +1,11 @@
 id,nombre,precio,cantidad
-1,iPhone 15,14999.0,82
-2,Samsung Galaxy S24,16999.0,138
-3,Xiaomi Redmi Note 13,4999.0,52
-4,Motorola Edge 50,8999.0,165
-5,Google Pixel 8,11999.0,30
-7,Huawei Nova 12,7999.0,122
-9,OPPO Reno 12,8499.0,191
-11,Sony Xperia 10 VI,10999.0,147
-12,ThinkCentre i7 32 RAM,30000.0,42
-13,Vivo50 512 GB RAM,15000.0,48
+1,iPhone 15,14999,82
+2,Samsung Galaxy S24,16999,138
+3,Xiaomi Redmi Note 13,4999,52
+4,Motorola Edge 50,8999,165
+5,Google Pixel 8,11999,30
+7,Huawei Nova 12,7999,122
+9,OPPO Reno 12 32,8499,191
+11,Sony Xperia 10 VI,10999,147
+12,ThinkCentre i7 32 RAM,30000,42
+13,Vivo50 512 GB RAM,15000,48
