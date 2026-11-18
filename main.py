@@ -16,7 +16,6 @@ import pandas as pd
 from datetime import datetime
 from pathlib import Path
 
-
 BASE_DIR = Path(__file__).resolve().parent
 ARCHIVO_PRODUCTOS = BASE_DIR / "productos.csv"
 ARCHIVO_VENTAS = BASE_DIR / "ventas.csv"
